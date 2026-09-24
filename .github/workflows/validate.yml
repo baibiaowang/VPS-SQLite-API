@@ -1,0 +1,23 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m py_compile app/*.py
+      - run: bash -n install.sh
+      - run: python - <<'PY'
+import ast
+for path in ["app/api.py", "app/admin.py", "app/collector.py", "app/backup.py", "app/db.py", "app/auth.py"]:
+    ast.parse(open(path, encoding="utf-8").read(), filename=path)
+print("AST OK")
+PY
