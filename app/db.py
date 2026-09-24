@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS analysis_results (
 CREATE TABLE IF NOT EXISTS settings (
  key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS request_stats (
+ stat_date TEXT PRIMARY KEY, request_count INTEGER NOT NULL DEFAULT 0, last_request_at TEXT
+);
 CREATE INDEX IF NOT EXISTS idx_ann_date ON announcements(notice_date);
 CREATE INDEX IF NOT EXISTS idx_ann_sort ON announcements(sort_date);
 CREATE INDEX IF NOT EXISTS idx_ann_stock_code ON announcement_stocks(stock_code);
@@ -54,6 +57,11 @@ DEFAULT_SETTINGS = {
     "random_jitter_ms": "500", "max_retries": "5",
     "backoff_base_seconds": "3", "daily_request_limit": "500",
     "backup_enabled": "1", "backup_time": "02:00", "backup_keep": "7", "last_scheduled_run": "",
+    "collector_status": "idle", "collector_run_id": "", "collector_started_at": "",
+    "collector_finished_at": "", "collector_target": "", "collector_page": "0",
+    "collector_total_pages": "0", "collector_received": "0", "collector_inserted": "0",
+    "collector_duplicate": "0", "collector_error": "", "collector_stop_requested": "0",
+    "collector_pause_requested": "0", "cooldown_until": "",
 }
 
 def utc_now(): return datetime.now(timezone.utc).isoformat()
@@ -81,6 +89,25 @@ def get_settings():
     init_db()
     with connect() as conn:
         return {r["key"]: r["value"] for r in conn.execute("SELECT key,value FROM settings")}
+
+def request_count_today():
+    init_db()
+    today = datetime.now(timezone.utc).date().isoformat()
+    with connect() as conn:
+        row = conn.execute("SELECT request_count FROM request_stats WHERE stat_date=?", (today,)).fetchone()
+        return int(row["request_count"]) if row else 0
+
+def record_request():
+    init_db()
+    today = datetime.now(timezone.utc).date().isoformat()
+    now = utc_now()
+    with connect() as conn:
+        conn.execute("""INSERT INTO request_stats(stat_date,request_count,last_request_at)
+                        VALUES(?,?,?)
+                        ON CONFLICT(stat_date) DO UPDATE SET
+                        request_count=request_count+1,last_request_at=excluded.last_request_at""",
+                     (today, 1, now))
+        conn.commit()
 
 def set_settings(values):
     init_db(); now = utc_now()
