@@ -11,41 +11,32 @@ PRAGMA foreign_keys=ON;
 PRAGMA busy_timeout=10000;
 
 CREATE TABLE IF NOT EXISTS announcements (
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- art_code TEXT NOT NULL UNIQUE,
- title TEXT, title_ch TEXT, title_en TEXT,
- notice_date TEXT, display_time TEXT, sort_date TEXT, ei_time TEXT,
- language TEXT, product_code TEXT, source_type TEXT,
- raw_json TEXT NOT NULL,
- first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL
+ id INTEGER PRIMARY KEY AUTOINCREMENT, art_code TEXT NOT NULL UNIQUE,
+ title TEXT, title_ch TEXT, title_en TEXT, notice_date TEXT, display_time TEXT,
+ sort_date TEXT, ei_time TEXT, language TEXT, product_code TEXT, source_type TEXT,
+ raw_json TEXT NOT NULL, first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS announcement_stocks (
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- announcement_id INTEGER NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
+ id INTEGER PRIMARY KEY AUTOINCREMENT, announcement_id INTEGER NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
  stock_code TEXT NOT NULL, stock_name TEXT, inner_code TEXT, market_code TEXT, ann_type TEXT,
  UNIQUE(announcement_id, stock_code)
 );
 CREATE TABLE IF NOT EXISTS announcement_columns (
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- announcement_id INTEGER NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
- column_code TEXT, column_name TEXT,
- UNIQUE(announcement_id, column_code, column_name)
+ id INTEGER PRIMARY KEY AUTOINCREMENT, announcement_id INTEGER NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
+ column_code TEXT, column_name TEXT, UNIQUE(announcement_id, column_code, column_name)
 );
 CREATE TABLE IF NOT EXISTS fetch_logs (
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- fetch_date TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT,
- page_size INTEGER, pages INTEGER DEFAULT 0, expected_count INTEGER DEFAULT 0,
- received_count INTEGER DEFAULT 0, inserted_count INTEGER DEFAULT 0,
- duplicate_count INTEGER DEFAULT 0, success INTEGER NOT NULL DEFAULT 0,
- error_message TEXT
+ id INTEGER PRIMARY KEY AUTOINCREMENT, fetch_date TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT,
+ page_size INTEGER, pages INTEGER DEFAULT 0, expected_count INTEGER DEFAULT 0, received_count INTEGER DEFAULT 0,
+ inserted_count INTEGER DEFAULT 0, duplicate_count INTEGER DEFAULT 0, success INTEGER NOT NULL DEFAULT 0, error_message TEXT
 );
 CREATE TABLE IF NOT EXISTS analysis_results (
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- announcement_id INTEGER NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
- analyzer TEXT NOT NULL, rule_version TEXT NOT NULL,
- category TEXT, is_noise INTEGER, summary TEXT, key_numbers TEXT, result_json TEXT,
- created_at TEXT NOT NULL,
- UNIQUE(announcement_id, analyzer, rule_version)
+ id INTEGER PRIMARY KEY AUTOINCREMENT, announcement_id INTEGER NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
+ analyzer TEXT NOT NULL, rule_version TEXT NOT NULL, category TEXT, is_noise INTEGER, summary TEXT, key_numbers TEXT,
+ result_json TEXT, created_at TEXT NOT NULL, UNIQUE(announcement_id, analyzer, rule_version)
+);
+CREATE TABLE IF NOT EXISTS settings (
+ key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_ann_date ON announcements(notice_date);
 CREATE INDEX IF NOT EXISTS idx_ann_sort ON announcements(sort_date);
@@ -56,8 +47,16 @@ CREATE INDEX IF NOT EXISTS idx_ann_column_name ON announcement_columns(column_na
 CREATE INDEX IF NOT EXISTS idx_analysis_category ON analysis_results(category);
 """
 
-def utc_now():
-    return datetime.now(timezone.utc).isoformat()
+DEFAULT_SETTINGS = {
+    "schedule_enabled": "1", "schedule_interval_minutes": "1440",
+    "schedule_start_time": "23:30", "fetch_days_back": "1",
+    "max_concurrency": "2", "request_interval_ms": "500",
+    "random_jitter_ms": "500", "max_retries": "5",
+    "backoff_base_seconds": "3", "daily_request_limit": "500",
+    "backup_enabled": "1", "backup_time": "02:00", "backup_keep": "7",
+}
+
+def utc_now(): return datetime.now(timezone.utc).isoformat()
 
 def connect():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -72,47 +71,51 @@ def connect():
 def init_db():
     with connect() as conn:
         conn.executescript(SCHEMA)
+        now = utc_now()
+        for key, value in DEFAULT_SETTINGS.items():
+            conn.execute("INSERT OR IGNORE INTO settings(key,value,updated_at) VALUES(?,?,?)",
+                         (key, value, now))
+        conn.commit()
+
+def get_settings():
+    init_db()
+    with connect() as conn:
+        return {r["key"]: r["value"] for r in conn.execute("SELECT key,value FROM settings")}
+
+def set_settings(values):
+    init_db(); now = utc_now()
+    with connect() as conn:
+        for key, value in values.items():
+            if key in DEFAULT_SETTINGS:
+                conn.execute("INSERT INTO settings(key,value,updated_at) VALUES(?,?,?) "
+                             "ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at",
+                             (key, str(value), now))
         conn.commit()
 
 def insert_announcement(conn, item):
     art_code = str(item.get("art_code") or "").strip()
-    if not art_code:
-        raise ValueError("missing art_code")
-    now = utc_now()
-    raw = json.dumps(item, ensure_ascii=False, separators=(",", ":"))
+    if not art_code: raise ValueError("missing art_code")
+    now, raw = utc_now(), json.dumps(item, ensure_ascii=False, separators=(",", ":"))
     row = conn.execute("SELECT id FROM announcements WHERE art_code=?", (art_code,)).fetchone()
     if row:
-        ann_id = int(row["id"])
-        conn.execute("UPDATE announcements SET last_seen_at=? WHERE id=?", (now, ann_id))
-        inserted = False
+        ann_id, inserted = int(row["id"]), False
+        conn.execute("UPDATE announcements SET last_seen_at=?,raw_json=? WHERE id=?", (now,raw,ann_id))
     else:
-        cur = conn.execute(
-            """INSERT INTO announcements
-            (art_code,title,title_ch,title_en,notice_date,display_time,sort_date,ei_time,
-             language,product_code,source_type,raw_json,first_seen_at,last_seen_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (art_code,item.get("title"),item.get("title_ch"),item.get("title_en"),
-             item.get("notice_date"),item.get("display_time"),item.get("sort_date"),
-             item.get("eiTime") or item.get("ei_time"),item.get("language"),
-             item.get("product_code"),item.get("source_type"),raw,now,now))
-        ann_id = int(cur.lastrowid)
-        inserted = True
-
+        cur = conn.execute("""INSERT INTO announcements
+        (art_code,title,title_ch,title_en,notice_date,display_time,sort_date,ei_time,language,product_code,source_type,raw_json,first_seen_at,last_seen_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (art_code,item.get("title"),item.get("title_ch"),item.get("title_en"),item.get("notice_date"),item.get("display_time"),
+         item.get("sort_date"),item.get("eiTime") or item.get("ei_time"),item.get("language"),item.get("product_code"),
+         item.get("source_type"),raw,now,now))
+        ann_id, inserted = int(cur.lastrowid), True
     for stock in item.get("codes") or []:
-        if not isinstance(stock, dict): continue
-        code = str(stock.get("stock_code") or "").strip()
-        if not code: continue
-        conn.execute(
-            """INSERT OR IGNORE INTO announcement_stocks
-            (announcement_id,stock_code,stock_name,inner_code,market_code,ann_type)
-            VALUES (?,?,?,?,?,?)""",
-            (ann_id,code,stock.get("short_name"),stock.get("inner_code"),
-             stock.get("market_code"),stock.get("ann_type")))
-
+        if isinstance(stock, dict) and str(stock.get("stock_code") or "").strip():
+            conn.execute("""INSERT OR IGNORE INTO announcement_stocks
+            (announcement_id,stock_code,stock_name,inner_code,market_code,ann_type) VALUES (?,?,?,?,?,?)""",
+            (ann_id,str(stock.get("stock_code")).strip(),stock.get("short_name"),stock.get("inner_code"),stock.get("market_code"),stock.get("ann_type")))
     for column in item.get("columns") or []:
-        if not isinstance(column, dict): continue
-        conn.execute(
-            """INSERT OR IGNORE INTO announcement_columns
+        if isinstance(column, dict):
+            conn.execute("""INSERT OR IGNORE INTO announcement_columns
             (announcement_id,column_code,column_name) VALUES (?,?,?)""",
             (ann_id,column.get("column_code"),column.get("column_name")))
     return ann_id, inserted
