@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import requests
 from .config import EASTMONEY_URL, PAGE_SIZE, RAW_DIR, USER_AGENT, BASE_DIR
-from .db import connect, get_settings, init_db, insert_announcement, utc_now, set_settings, reserve_request_slot
+from .db import connect, get_settings, init_db, insert_announcement, utc_now, set_settings, reserve_request_slot, latest_request_at
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("collector")
@@ -73,6 +73,13 @@ def throttle(s):
                 pass
         delay = int(s["request_interval_ms"]) / 1000 + random.uniform(0, int(s["random_jitter_ms"]) / 1000)
         wait = delay - (time.monotonic() - _last_request)
+        persisted = latest_request_at()
+        if persisted:
+            try:
+                persisted_elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(persisted)).total_seconds()
+                wait = max(wait, delay - persisted_elapsed)
+            except ValueError:
+                pass
         if wait > 0:
             time.sleep(wait)
         if not reserve_request_slot(int(s["daily_request_limit"])):
@@ -206,7 +213,7 @@ def main():
     run_id=uuid.uuid4().hex[:12]
     set_state(collector_status="running",collector_run_id=run_id,collector_started_at=utc_now(),
               collector_finished_at="",collector_error="",collector_stop_requested="0",
-              collector_pause_requested="0",cooldown_until="",collector_page="0",
+              collector_pause_requested="0",,collector_page="0",
               collector_total_pages="0",collector_received="0",collector_inserted="0",collector_duplicate="0")
     try:
         ok=run_incremental() if a.incremental else run_backfill(*a.backfill)
