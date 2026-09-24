@@ -80,7 +80,6 @@ EOF
   echo "=============================================="
   echo "首次安装生成的 API Token（只显示这一次）："
   echo "$API_TOKEN"
-  echo "请立即保存。"
   echo "=============================================="
 fi
 
@@ -94,7 +93,7 @@ chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
 chmod 750 "$APP_DIR"
 chmod 700 "$APP_DIR/data" "$APP_DIR/data/raw" "$APP_DIR/data/backup" "$APP_DIR/logs"
 
-sudo -u "$SERVICE_USER" "$APP_DIR/venv/bin/python" -m app.db
+runuser -u "$SERVICE_USER" -- "$APP_DIR/venv/bin/python" -m app.db
 
 systemctl daemon-reload
 systemctl enable --now eastmoney-api.service
