@@ -51,7 +51,6 @@ def dashboard(request:Request):
     running=status in ("running","paused")
     today_req=request_count_today()
     limit=int(cfg.get("daily_request_limit","500"))
-    pct=min(100,int(today_req*100/max(1,limit)))
     next_text="未计算"
     if cfg.get("schedule_enabled")=="1":
         try:
@@ -65,7 +64,7 @@ def dashboard(request:Request):
                 if nxt<now:nxt+=timedelta(days=1)
             next_text=nxt.strftime("%Y-%m-%d %H:%M")
         except Exception: next_text="—"
-    status_label={"idle":"空闲","running":"采集中","paused":"已暂停","error":"上次出错"}.get(status,status)
+    status_label={"idle":"空闲","running":"采集中","paused":"已暂停","stopped":"已停止","error":"上次出错"}.get(status,status)
     rows="".join(f"<tr><td>{escape(str(x['fetch_date']))}</td><td>{x['received_count']}</td><td>{x['inserted_count']}</td><td>{x['duplicate_count']}</td><td>{'成功' if x['success'] else '失败'}</td><td>{escape(str(x.get('error_message') or ''))}</td></tr>" for x in logs)
     checked=" checked" if cfg["schedule_enabled"]=="1" else ""
     csrf=escape(s["csrf"])
@@ -116,6 +115,11 @@ def save_settings(request:Request, csrf:str=Form(...), schedule_enabled:str|None
                   daily_request_limit:int=Form(...)):
     s=sess(request)
     if not s or not secrets.compare_digest(csrf,s.get("csrf","")): return HTMLResponse("Forbidden",status_code=403)
+    try:
+        parsed_time=datetime.strptime(schedule_start_time,"%H:%M")
+        schedule_start_time=parsed_time.strftime("%H:%M")
+    except ValueError:
+        return HTMLResponse("时间格式无效，应为 HH:MM",status_code=400)
     vals={"schedule_enabled":"1" if schedule_enabled else "0",
           "schedule_interval_minutes":max(5,min(10080,schedule_interval_minutes)),
           "schedule_start_time":schedule_start_time,
