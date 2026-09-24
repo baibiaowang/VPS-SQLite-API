@@ -150,6 +150,8 @@ def action(request:Request,action:str=Form(...),csrf:str=Form(...)):
     elif action=="backup":
         subprocess.Popen([sys.executable,"-m","app.backup"],cwd="/opt/eastmoney",
                          start_new_session=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    else:
+        return HTMLResponse("未知操作",status_code=400)
     return RedirectResponse("/admin",status_code=303)
 
 @router.get("/admin/logout")
