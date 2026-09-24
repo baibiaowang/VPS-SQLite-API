@@ -46,8 +46,7 @@ class CoreTests(unittest.TestCase):
                 (ann_id,),
             ).fetchone()
         self.assertEqual(row["title"], "新标题")
-        # Relationship rows are intentionally append-only; the latest raw item remains authoritative.
-        self.assertEqual(stock["stock_name"], "旧名")
+        self.assertEqual(stock["stock_name"], "新名")
 
     def test_scheduler_does_not_overlap_running_collector(self):
         now = datetime.now()
