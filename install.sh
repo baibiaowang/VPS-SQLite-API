@@ -88,6 +88,8 @@ cp "$APP_DIR/deploy/eastmoney-fetch.service" /etc/systemd/system/eastmoney-fetch
 cp "$APP_DIR/deploy/eastmoney-fetch.timer" /etc/systemd/system/eastmoney-fetch.timer
 cp "$APP_DIR/deploy/eastmoney-backup.service" /etc/systemd/system/eastmoney-backup.service
 cp "$APP_DIR/deploy/eastmoney-backup.timer" /etc/systemd/system/eastmoney-backup.timer
+cp "$APP_DIR/deploy/eastmoney-scheduler.service" /etc/systemd/system/eastmoney-scheduler.service
+cp "$APP_DIR/deploy/eastmoney-scheduler.timer" /etc/systemd/system/eastmoney-scheduler.timer
 
 chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
 chmod 750 "$APP_DIR"
@@ -99,6 +101,7 @@ systemctl daemon-reload
 systemctl enable --now eastmoney-api.service
 systemctl enable --now eastmoney-fetch.timer
 systemctl enable --now eastmoney-backup.timer
+systemctl enable --now eastmoney-scheduler.timer
 
 echo
 echo "安装完成。"
@@ -106,3 +109,4 @@ echo "管理面板: http://SERVER_IP:8080/admin/login"
 echo "API 文档: http://SERVER_IP:8080/docs"
 echo "服务状态: systemctl status eastmoney-api"
 echo "立即抓取: systemctl start eastmoney-fetch.service"
+echo "调度器: systemctl status eastmoney-scheduler.timer"
