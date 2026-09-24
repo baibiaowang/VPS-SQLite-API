@@ -109,6 +109,27 @@ def record_request():
                      (today, 1, now))
         conn.commit()
 
+def reserve_request_slot(limit):
+    """Atomically reserve one HTTP request against the persistent daily limit."""
+    if limit < 1:
+        return False
+    today = datetime.now(timezone.utc).date().isoformat()
+    now = utc_now()
+    with connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT request_count FROM request_stats WHERE stat_date=?", (today,)).fetchone()
+        current = int(row["request_count"]) if row else 0
+        if current >= limit:
+            conn.rollback()
+            return False
+        conn.execute("""INSERT INTO request_stats(stat_date,request_count,last_request_at)
+                        VALUES(?,?,?)
+                        ON CONFLICT(stat_date) DO UPDATE SET
+                        request_count=request_count+1,last_request_at=excluded.last_request_at""",
+                     (today, 1, now))
+        conn.commit()
+        return True
+
 def set_settings(values):
     init_db(); now = utc_now()
     with connect() as conn:
