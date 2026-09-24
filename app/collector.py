@@ -64,9 +64,6 @@ def state_check():
 def throttle(s):
     global _last_request
     with _request_lock:
-        limit = int(s["daily_request_limit"])
-        if not reserve_request_slot(limit):
-            raise RuntimeError("daily request limit reached")
         cooldown = s.get("cooldown_until","")
         if cooldown:
             try:
@@ -78,6 +75,8 @@ def throttle(s):
         wait = delay - (time.monotonic() - _last_request)
         if wait > 0:
             time.sleep(wait)
+        if not reserve_request_slot(int(s["daily_request_limit"])):
+            raise RuntimeError("daily request limit reached")
         _last_request = time.monotonic()
 
 def fetch_page(target_date, page, s):
@@ -102,7 +101,8 @@ def fetch_page(target_date, page, s):
             return page,payload
         except Exception as exc:
             last=exc
-            if "cooldown" in str(exc).lower():
+            msg = str(exc).lower()
+            if any(marker in msg for marker in ("cooldown", "daily request limit", "stop requested")):
                 raise
             if attempt+1 >= int(s["max_retries"]):
                 raise
