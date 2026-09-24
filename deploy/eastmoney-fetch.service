@@ -1,0 +1,18 @@
+[Unit]
+Description=Eastmoney daily incremental fetch
+After=network-online.target eastmoney-api.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=eastmoney
+Group=eastmoney
+WorkingDirectory=/opt/eastmoney
+EnvironmentFile=/etc/eastmoney/eastmoney.env
+ExecStart=/opt/eastmoney/venv/bin/python -m app.collector --incremental
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/eastmoney/data /opt/eastmoney/logs
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
