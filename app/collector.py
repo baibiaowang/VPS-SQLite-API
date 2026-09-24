@@ -64,7 +64,6 @@ def state_check():
 def throttle(s):
     global _last_request
     with _request_lock:
-        today = date.today().isoformat()
         limit = int(s["daily_request_limit"])
         if not reserve_request_slot(limit):
             raise RuntimeError("daily request limit reached")
@@ -80,7 +79,6 @@ def throttle(s):
         if wait > 0:
             time.sleep(wait)
         _last_request = time.monotonic()
-        record_request()
 
 def fetch_page(target_date, page, s):
     params={"sr":"-1","page_size":PAGE_SIZE,"page_index":page,"ann_type":"A","client_source":"web",
