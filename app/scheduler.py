@@ -7,6 +7,13 @@ def due(s, now):
     if s["schedule_enabled"] != "1":
         return False
     interval = max(5, int(s["schedule_interval_minutes"]))
+    cooldown = s.get("cooldown_until","")
+    if cooldown:
+        try:
+            if datetime.fromisoformat(cooldown) > now:
+                return False
+        except ValueError:
+            pass
     last = s.get("last_scheduled_run","")
     if last:
         try:
