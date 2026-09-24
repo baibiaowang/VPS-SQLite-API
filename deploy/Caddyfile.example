@@ -1,0 +1,15 @@
+# 将 example.com 替换成你的域名。
+# DNS A/AAAA 记录指向 VPS。
+# Caddy 会自动申请和续期 HTTPS 证书。
+
+example.com {
+    encode gzip
+    reverse_proxy 127.0.0.1:8080
+
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "same-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+}
