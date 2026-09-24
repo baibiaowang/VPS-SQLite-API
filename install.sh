@@ -44,6 +44,10 @@ if [ ! -f "$ENV_FILE" ]; then
       exit 1
     fi
   fi
+  if [ -z "$ADMIN_PASS" ] || [ "${#ADMIN_PASS}" -lt 10 ]; then
+    echo "管理密码长度必须至少为10位。"
+    exit 1
+  fi
 
   SALT="$(openssl rand -hex 16)"
   PASSWORD_HASH="$("$APP_DIR/venv/bin/python" - "$ADMIN_PASS" "$SALT" <<'PY'
