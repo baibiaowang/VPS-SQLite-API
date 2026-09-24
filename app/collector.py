@@ -171,6 +171,9 @@ def fetch_date(target_date):
         log.info("%s ok expected=%s received=%s new=%s duplicate=%s pages=%s",target_date,expected,received,inserted,duplicate,pages)
         return True
     except Exception as exc:
+        message = str(exc)
+        status = "stopped" if "stop requested" in message.lower() else "error"
+        set_state(collector_status=status)
         with connect() as conn:
             conn.execute("""INSERT INTO fetch_logs
             (fetch_date,started_at,finished_at,page_size,pages,expected_count,received_count,inserted_count,duplicate_count,success,error_message)
@@ -217,7 +220,12 @@ def main():
               collector_total_pages="0",collector_received="0",collector_inserted="0",collector_duplicate="0")
     try:
         ok=run_incremental() if a.incremental else run_backfill(*a.backfill)
-        set_state(collector_status="idle" if ok else "error",collector_finished_at=utc_now())
+        final_status = get_settings().get("collector_status","error")
+        if ok:
+            final_status = "idle"
+        elif final_status not in ("stopped",):
+            final_status = "error"
+        set_state(collector_status=final_status,collector_finished_at=utc_now())
         return 0 if ok else 1
     except Exception as exc:
         final_status = "stopped" if "stop requested" in str(exc).lower() else "error"
