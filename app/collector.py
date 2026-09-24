@@ -16,7 +16,9 @@ _file_lock = None
 
 def settings():
     s = get_settings()
-    return {k: int(v) if k not in ("schedule_start_time","backup_time","cooldown_until") else v for k,v in s.items()}
+    string_keys={"schedule_start_time","backup_time","cooldown_until","collector_status","collector_run_id",
+                 "collector_started_at","collector_finished_at","collector_target","collector_error"}
+    return {k: int(v) if k not in string_keys else v for k,v in s.items()}
 
 def acquire_run_lock():
     global _file_lock
