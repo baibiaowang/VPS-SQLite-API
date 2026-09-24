@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import requests
 from .config import EASTMONEY_URL, PAGE_SIZE, RAW_DIR, USER_AGENT, BASE_DIR
-from .db import connect, get_settings, init_db, insert_announcement, utc_now, set_settings, request_count_today, record_request
+from .db import connect, get_settings, init_db, insert_announcement, utc_now, set_settings, reserve_request_slot
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("collector")
@@ -66,7 +66,7 @@ def throttle(s):
     with _request_lock:
         today = date.today().isoformat()
         limit = int(s["daily_request_limit"])
-        if request_count_today() >= limit:
+        if not reserve_request_slot(limit):
             raise RuntimeError("daily request limit reached")
         cooldown = s.get("cooldown_until","")
         if cooldown:
