@@ -1,0 +1,27 @@
+[Unit]
+Description=Eastmoney SQLite API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=eastmoney
+Group=eastmoney
+WorkingDirectory=/opt/eastmoney
+EnvironmentFile=/etc/eastmoney/eastmoney.env
+ExecStart=/opt/eastmoney/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080 --proxy-headers
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/eastmoney/data /opt/eastmoney/logs
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+LockPersonality=true
+MemoryMax=700M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target
