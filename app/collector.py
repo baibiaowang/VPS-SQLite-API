@@ -10,7 +10,6 @@ from .db import connect, get_settings, init_db, insert_announcement, utc_now, se
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("collector")
 _request_lock = threading.Lock()
-_http_semaphore = threading.Semaphore(2)
 _last_request = 0.0
 _file_lock = None
 
@@ -84,8 +83,6 @@ def throttle(s):
         record_request()
 
 def fetch_page(target_date, page, s):
-    global _http_semaphore
-    _http_semaphore = threading.Semaphore(max(1, min(int(s["max_concurrency"]), 8)))
     params={"sr":"-1","page_size":PAGE_SIZE,"page_index":page,"ann_type":"A","client_source":"web",
             "begin_time":target_date,"end_time":target_date,"f_node":"0","s_node":"0"}
     last=None
@@ -93,9 +90,8 @@ def fetch_page(target_date, page, s):
         try:
             state_check()
             throttle(s)
-            with _http_semaphore:
-                r=requests.get(EASTMONEY_URL,params=params,timeout=30,
-                               headers={"User-Agent":USER_AGENT,"Accept":"application/json,text/plain,*/*"})
+            r=requests.get(EASTMONEY_URL,params=params,timeout=30,
+                           headers={"User-Agent":USER_AGENT,"Accept":"application/json,text/plain,*/*"})
             if r.status_code in (403,429):
                 set_state(cooldown_until=(datetime.now(timezone.utc)+timedelta(minutes=15)).isoformat())
                 raise requests.HTTPError(f"HTTP {r.status_code}")
@@ -163,6 +159,8 @@ def fetch_date(target_date):
             VALUES (?,?,?,?,?,?,?,?,?,1)""",
             (target_date,started,utc_now(),PAGE_SIZE,pages,expected,received,inserted,duplicate))
             conn.commit()
+        if received < expected:
+            raise RuntimeError(f"incomplete fetch: expected {expected}, received {received}")
         set_state(collector_received=str(received),collector_inserted=str(inserted),collector_duplicate=str(duplicate))
         log.info("%s ok expected=%s received=%s new=%s duplicate=%s pages=%s",target_date,expected,received,inserted,duplicate,pages)
         return True
@@ -216,7 +214,8 @@ def main():
         set_state(collector_status="idle" if ok else "error",collector_finished_at=utc_now())
         return 0 if ok else 1
     except Exception as exc:
-        set_state(collector_status="error",collector_error=str(exc)[:500],collector_finished_at=utc_now())
+        final_status = "stopped" if "stop requested" in str(exc).lower() else "error"
+        set_state(collector_status=final_status,collector_error=str(exc)[:500],collector_finished_at=utc_now())
         log.exception("collector aborted")
         return 1
     finally:
