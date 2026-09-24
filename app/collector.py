@@ -213,7 +213,7 @@ def main():
     run_id=uuid.uuid4().hex[:12]
     set_state(collector_status="running",collector_run_id=run_id,collector_started_at=utc_now(),
               collector_finished_at="",collector_error="",collector_stop_requested="0",
-              collector_pause_requested="0",,collector_page="0",
+              collector_pause_requested="0",collector_page="0",
               collector_total_pages="0",collector_received="0",collector_inserted="0",collector_duplicate="0")
     try:
         ok=run_incremental() if a.incremental else run_backfill(*a.backfill)
