@@ -126,7 +126,13 @@ def insert_announcement(conn, item):
     row = conn.execute("SELECT id FROM announcements WHERE art_code=?", (art_code,)).fetchone()
     if row:
         ann_id, inserted = int(row["id"]), False
-        conn.execute("UPDATE announcements SET last_seen_at=?,raw_json=? WHERE id=?", (now,raw,ann_id))
+        conn.execute("""UPDATE announcements SET
+            title=?,title_ch=?,title_en=?,notice_date=?,display_time=?,sort_date=?,
+            ei_time=?,language=?,product_code=?,source_type=?,last_seen_at=?,raw_json=?
+            WHERE id=?""",
+            (item.get("title"),item.get("title_ch"),item.get("title_en"),item.get("notice_date"),
+             item.get("display_time"),item.get("sort_date"),item.get("eiTime") or item.get("ei_time"),
+             item.get("language"),item.get("product_code"),item.get("source_type"),now,raw,ann_id))
     else:
         cur = conn.execute("""INSERT INTO announcements
         (art_code,title,title_ch,title_en,notice_date,display_time,sort_date,ei_time,language,product_code,source_type,raw_json,first_seen_at,last_seen_at)
