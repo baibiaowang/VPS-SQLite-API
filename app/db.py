@@ -53,7 +53,7 @@ DEFAULT_SETTINGS = {
     "max_concurrency": "2", "request_interval_ms": "500",
     "random_jitter_ms": "500", "max_retries": "5",
     "backoff_base_seconds": "3", "daily_request_limit": "500",
-    "backup_enabled": "1", "backup_time": "02:00", "backup_keep": "7",
+    "backup_enabled": "1", "backup_time": "02:00", "backup_keep": "7", "last_scheduled_run": "",
 }
 
 def utc_now(): return datetime.now(timezone.utc).isoformat()
