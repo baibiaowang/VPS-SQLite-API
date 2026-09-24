@@ -1,0 +1,1 @@
+"""Eastmoney announcement database service."""
