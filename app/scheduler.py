@@ -1,11 +1,11 @@
 from __future__ import annotations
-from datetime import datetime, date
+from datetime import datetime
 import subprocess, sys
 from .db import get_settings, set_settings
 
 def due(s, now):
-    if s["schedule_enabled"] != "1": return False
-    interval = int(s["schedule_interval_minutes"])
+    if s["schedule_enabled"] != "1" or s.get("collector_status") == "running": return False
+    interval = max(5, int(s["schedule_interval_minutes"]))
     last = s.get("last_scheduled_run","")
     if last:
         try:
