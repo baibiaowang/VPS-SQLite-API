@@ -164,8 +164,11 @@ def insert_announcement(conn, item):
         ann_id, inserted = int(cur.lastrowid), True
     for stock in item.get("codes") or []:
         if isinstance(stock, dict) and str(stock.get("stock_code") or "").strip():
-            conn.execute("""INSERT OR IGNORE INTO announcement_stocks
-            (announcement_id,stock_code,stock_name,inner_code,market_code,ann_type) VALUES (?,?,?,?,?,?)""",
+            conn.execute("""INSERT INTO announcement_stocks
+            (announcement_id,stock_code,stock_name,inner_code,market_code,ann_type) VALUES (?,?,?,?,?,?)
+            ON CONFLICT(announcement_id,stock_code) DO UPDATE SET
+            stock_name=excluded.stock_name,inner_code=excluded.inner_code,
+            market_code=excluded.market_code,ann_type=excluded.ann_type""",
             (ann_id,str(stock.get("stock_code")).strip(),stock.get("short_name"),stock.get("inner_code"),stock.get("market_code"),stock.get("ann_type")))
     for column in item.get("columns") or []:
         if isinstance(column, dict):
