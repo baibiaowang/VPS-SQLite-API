@@ -3,6 +3,7 @@ Description=Eastmoney scheduler tick
 
 [Service]
 Type=oneshot
+TimeoutStartSec=infinity
 User=eastmoney
 Group=eastmoney
 WorkingDirectory=/opt/eastmoney
