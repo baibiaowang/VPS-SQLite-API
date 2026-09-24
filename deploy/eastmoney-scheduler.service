@@ -1,0 +1,15 @@
+[Unit]
+Description=Eastmoney scheduler tick
+
+[Service]
+Type=oneshot
+User=eastmoney
+Group=eastmoney
+WorkingDirectory=/opt/eastmoney
+EnvironmentFile=/etc/eastmoney/eastmoney.env
+ExecStart=/opt/eastmoney/venv/bin/python -m app.scheduler
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/eastmoney/data /opt/eastmoney/logs
