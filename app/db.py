@@ -109,6 +109,14 @@ def record_request():
                      (today, 1, now))
         conn.commit()
 
+def latest_request_at():
+    init_db()
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT last_request_at FROM request_stats WHERE last_request_at IS NOT NULL ORDER BY stat_date DESC LIMIT 1"
+        ).fetchone()
+        return row["last_request_at"] if row else None
+
 def reserve_request_slot(limit):
     """Atomically reserve one HTTP request against the persistent daily limit."""
     if limit < 1:
