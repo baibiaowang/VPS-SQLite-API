@@ -99,7 +99,8 @@ runuser -u "$SERVICE_USER" -- "$APP_DIR/venv/bin/python" -m app.db
 
 systemctl daemon-reload
 systemctl enable --now eastmoney-api.service
-systemctl enable --now eastmoney-fetch.timer
+# 旧版固定 23:30 定时器会绕过面板计划；由 scheduler.timer 统一负责调度。
+systemctl disable --now eastmoney-fetch.timer 2>/dev/null || true
 systemctl enable --now eastmoney-backup.timer
 systemctl enable --now eastmoney-scheduler.timer
 
