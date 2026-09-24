@@ -153,14 +153,15 @@ def fetch_date(target_date):
                     seen.add(code); received+=1
                     _,new=insert_announcement(conn,item)
                     inserted += int(new); duplicate += int(not new)
+            if received < expected:
+                conn.rollback()
+                raise RuntimeError(f"incomplete fetch: expected {expected}, received {received}")
             conn.commit()
             conn.execute("""INSERT INTO fetch_logs
             (fetch_date,started_at,finished_at,page_size,pages,expected_count,received_count,inserted_count,duplicate_count,success)
             VALUES (?,?,?,?,?,?,?,?,?,1)""",
             (target_date,started,utc_now(),PAGE_SIZE,pages,expected,received,inserted,duplicate))
             conn.commit()
-        if received < expected:
-            raise RuntimeError(f"incomplete fetch: expected {expected}, received {received}")
         set_state(collector_received=str(received),collector_inserted=str(inserted),collector_duplicate=str(duplicate))
         log.info("%s ok expected=%s received=%s new=%s duplicate=%s pages=%s",target_date,expected,received,inserted,duplicate,pages)
         return True
