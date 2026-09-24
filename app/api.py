@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from .auth import verify_api_token
-from .config import PAGE_SIZE
+from .config import PAGE_SIZE, API_TOKEN_HASH, ADMIN_PASSWORD_HASH, SESSION_SECRET
 from .db import connect, init_db
 
 app = FastAPI(title="Eastmoney Announcement API", version="1.0.0")
@@ -33,6 +33,13 @@ def list_rows(sql, args):
 @app.on_event("startup")
 def startup():
     init_db()
+    missing = [name for name, value in {
+        "EASTMONEY_API_TOKEN_HASH": API_TOKEN_HASH,
+        "EASTMONEY_ADMIN_PASSWORD_HASH": ADMIN_PASSWORD_HASH,
+        "EASTMONEY_SESSION_SECRET": SESSION_SECRET,
+    }.items() if not value]
+    if missing:
+        raise RuntimeError("missing required security settings: " + ", ".join(missing))
 
 @app.get("/api/v1/health")
 def health(_: None = Depends(auth)):
